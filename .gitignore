@@ -4,4 +4,4 @@ venv/
 .env
 service_account.json
 oauth_config.json
-.vscode/
+.vscode/token.json
