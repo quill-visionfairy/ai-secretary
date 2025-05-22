@@ -16,7 +16,12 @@ from auth_manager import AuthManager
 load_dotenv()
 
 # Google Calendar에 접근하기 위한 권한 범위
-SCOPES = ['https://www.googleapis.com/auth/calendar.readonly']
+SCOPES = {
+    'google': [
+        'https://www.googleapis.com/auth/calendar.readonly',
+        'https://www.googleapis.com/auth/userinfo.email'
+    ]
+}
 
 def create_flow(platform='google'):
     """플랫폼별 OAuth Flow 객체 생성 (AuthManager 사용)"""
@@ -28,7 +33,8 @@ def get_calendar_service(user_id, platform='google'):
     tokens = auth.load_tokens(user_id)
     if not tokens:
         return None
-    creds = Credentials.from_authorized_user_info(tokens, auth.scopes)
+    scopes = SCOPES.get(platform, [])
+    creds = Credentials.from_authorized_user_info(tokens, scopes)
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
             creds.refresh(Request())
@@ -131,8 +137,11 @@ def route_calendar_service(user_id, start_date, end_date, platform=None):
         platform = 'google'  # 기본값
     if platform == 'google':
         return check_google_calendar(user_id, start_date, end_date, platform)
+    
+    # TODO: Notion 연동 시 notion_client를 사용해 일정 조회 구현 예정
     # elif platform == 'notion':
     #     return check_notion_calendar(user_id, start_date, end_date)
+    # TODO: Slack 연동 시 slash command 기반 회의 관리 예정
     # elif platform == 'slack':
     #     return check_slack_calendar(user_id, start_date, end_date)
     else:
