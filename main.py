@@ -11,17 +11,10 @@ from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import Flow
 from googleapiclient.discovery import build
 from auth_manager import AuthManager
+from config import SCOPES
 
 # .env 파일 로드
 load_dotenv()
-
-# Google Calendar에 접근하기 위한 권한 범위
-SCOPES = {
-    'google': [
-        'https://www.googleapis.com/auth/calendar.readonly',
-        'https://www.googleapis.com/auth/userinfo.email'
-    ]
-}
 
 def create_flow(platform='google'):
     """플랫폼별 OAuth Flow 객체 생성 (AuthManager 사용)"""

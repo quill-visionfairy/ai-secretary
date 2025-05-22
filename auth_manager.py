@@ -4,7 +4,7 @@ import json
 from google_auth_oauthlib.flow import Flow
 from google.oauth2.credentials import Credentials
 from google.auth.transport.requests import Request
-from main import SCOPES
+from config import SCOPES
 
 # Redis 연결 (환경 변수 또는 기본값 사용)
 REDIS_URL = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
