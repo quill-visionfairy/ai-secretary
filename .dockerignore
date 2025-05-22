@@ -1,0 +1,38 @@
+# 🐍 Python 관련 캐시
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# 📦 가상환경 폴더
+venv/
+.venv/
+
+# 🔐 민감한 정보 (절대 이미지에 포함하면 안 돼)
+.env
+.env.*
+*.json
+!requirements.txt  # 의존성은 포함해야 하니까 예외 처리
+
+# 🧪 테스트 관련
+tests/
+.pytest_cache/
+*.coverage
+.coverage.*
+htmlcov/
+
+# ⚙️ 빌드/배포 산출물
+*.egg-info/
+dist/
+build/
+.installed.txt
+
+# 💻 IDE/에디터 설정
+.vscode/
+.idea/
+
+# 🍏 macOS 자동 생성 파일
+.DS_Store
+
+# 🧹 기타 잡파일
+*.log

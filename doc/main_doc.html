@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>main.py 전체 코드 설명</title>
+  <style>
+    body { font-family: 'Segoe UI', sans-serif; line-height: 1.6; padding: 2rem; background: #f9f9f9; }
+    code { background-color: #eee; padding: 2px 6px; border-radius: 4px; }
+    .block { background: #fff; border-left: 4px solid #0077cc; padding: 1rem; margin-bottom: 1rem; border-radius: 6px; }
+    h2 { color: #005599; }
+    ul { padding-left: 1.2rem; }
+  </style>
+</head>
+<body>
+
+  <h1>📘 <code>main.py</code> 전체 코드 설명서</h1>
+  <p>이 파일은 AI 비서 서비스에서 Google Calendar API와의 통신을 담당하는 핵심 모듈입니다.</p>
+
+  <div class="block">
+    <h2>📌 주요 기능 요약</h2>
+    <ul>
+      <li>사용자 인증 토큰 기반으로 Google Calendar API 접근</li>
+      <li>캘린더 일정 조회 및 포맷 처리</li>
+      <li>플랫폼 확장(Notion, Slack 등)을 고려한 구조</li>
+    </ul>
+  </div>
+
+  <div class="block">
+    <h2>🔍 <code>get_calendar_service(user_id, platform='google')</code></h2>
+    <p><strong>가장 핵심적인 인증 함수</strong>로, Redis에 저장된 OAuth 토큰을 기반으로 서비스 객체를 생성합니다.</p>
+    <ul>
+      <li><code>AuthManager</code> 인스턴스를 통해 플랫폼별 인증 도우미 사용</li>
+      <li>Redis에서 토큰을 불러오고, 유효성 검사 및 자동 갱신 처리</li>
+      <li>최종적으로 <code>build('calendar', 'v3')</code>로 Google Calendar API 객체 생성</li>
+    </ul>
+    <pre><code>auth = AuthManager(platform)
+tokens = auth.load_tokens(user_id)
+if not tokens:
+    print("[DEBUG] ❌ No tokens found for user_id")
+    return None
+
+creds = Credentials.from_authorized_user_info(tokens, auth.scopes)
+if not creds or not creds.valid:
+    if creds and creds.expired and creds.refresh_token:
+        creds.refresh(Request())
+        auth.save_tokens(user_id, creds)
+    else:
+        print("[DEBUG] ❌ Token expired and no refresh token")
+        return None
+
+return build('calendar', 'v3', credentials=creds)</code></pre>
+  </div>
+
+  <div class="block">
+    <h2>📄 <code>create_flow()</code></h2>
+    <p>OAuth 인증을 위한 Flow 객체를 플랫폼에 맞게 생성하는 함수입니다.</p>
+  </div>
+
+  <div class="block">
+    <h2>📄 <code>credentials_to_dict()</code></h2>
+    <p>Google의 Credentials 객체를 JSON 저장 가능한 딕셔너리로 변환합니다.</p>
+  </div>
+
+  <div class="block">
+    <h2>📄 <code>get_events()</code></h2>
+    <p>시작 시간과 종료 시간을 기준으로 Google Calendar에서 일정을 조회하는 함수입니다.</p>
+  </div>
+
+  <div class="block">
+    <h2>📄 <code>format_event_time()</code></h2>
+    <p>캘린더 이벤트의 시작 시간을 사람이 읽기 쉬운 문자열로 변환합니다.</p>
+  </div>
+
+  <div class="block">
+    <h2>📄 <code>print_events_by_date()</code></h2>
+    <p>콘솔 디버깅용으로, 이벤트들을 날짜별로 정리하여 출력해줍니다.</p>
+  </div>
+
+  <div class="block">
+    <h2>📄 <code>check_google_calendar()</code></h2>
+    <p>전체 조회 흐름을 담당하는 함수로, 서비스 객체 생성 → 일정 조회 → 포맷까지 수행합니다.</p>
+  </div>
+
+  <div class="block">
+    <h2>📄 <code>route_calendar_service()</code></h2>
+    <p>플랫폼에 따라 적절한 캘린더 조회 함수를 호출하는 라우팅 함수입니다. 확장성 고려 최고!</p>
+  </div>
+
+  <div class="block">
+    <h2>📄 <code>main()</code></h2>
+    <p>직접 실행 시 테스트용으로 작동하는 함수입니다. 어제~내일 범위의 일정을 조회합니다.</p>
+  </div>
+
+</body>
+</html>

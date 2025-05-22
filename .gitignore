@@ -1,8 +1,59 @@
+# 📦 Python 기본 캐시 및 빌드 파일
 __pycache__/
-*.pyc
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg
+*.egg-info/
+.installed.txt
+
+# 🐍 가상환경
 venv/
+.venv/
+
+# 🧪 테스트 & 커버리지
+.pytest_cache/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.log
+htmlcov/
+tests/__pycache__/
+
+# 🛠️ 빌드 산출물
+build/
+dist/
+
+# 💻 IDE & 에디터 설정
+.idea/
+.vscode/
+.vscode/*.json
+*.sublime-project
+*.sublime-workspace
+
+# 🔐 민감한 설정 파일
 .env
+.env.*
+env.yaml
+*.pem
+*.key
+*.crt
+*.json
 service_account.json
 oauth_config.json
-.vscode/token.json
-env.yaml
+
+# 💻 운영체제별
+.DS_Store
+Thumbs.db
+
+# 📚 문서 편집기 백업 파일
+*.swp
+*.bak
+*.tmp
+
+# 🔧 기타
+docker-compose.override.yml

@@ -1,11 +1,35 @@
+# Git & 버전관리
 .git
 .gitignore
-.env
+
+# Python
 __pycache__/
-*.pyc
-token.json
-oauth_config.json
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg-info/
+
+# 가상환경
 venv/
 .venv/
+
+# 로그/테스트
+*.log
+.pytest_cache/
+tests/
+
+# 민감 정보
+.env
+.env.*
+token.json
+oauth_config.json
+service_account.json
+env.yaml
+
+# IDE & 에디터
 .idea/
-.vscode/ 
+.vscode/
+
+# macOS & 기타
+.DS_Store

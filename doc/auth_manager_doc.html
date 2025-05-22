@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <title>auth_manager.py 설명서</title>
+  <style>
+    body { font-family: 'Segoe UI', sans-serif; background: #f9f9f9; padding: 2rem; line-height: 1.6; }
+    h1, h2 { color: #2c3e50; }
+    code, pre { background: #eee; padding: 3px 6px; border-radius: 4px; }
+    .block { background: #fff; padding: 1rem; border-left: 5px solid #4caf50; margin-bottom: 2rem; border-radius: 6px; }
+  </style>
+</head>
+<body>
+
+  <h1>🔐 <code>auth_manager.py</code> 설명서</h1>
+  <p>이 모듈은 <strong>OAuth 인증 처리 및 토큰 관리</strong>를 담당하는 <code>AuthManager</code> 클래스를 포함합니다.<br>
+     Google 인증을 기본으로, 향후 Notion/Slack 등으로 확장이 가능하도록 설계되어 있어요 ✨</p>
+
+  <div class="block">
+    <h2>🔗 Redis 연결</h2>
+    <pre><code>redis_client = redis.Redis.from_url(REDIS_URL)</code></pre>
+    <p><code>REDIS_URL</code>은 환경 변수로 설정되어 있으며, 토큰 저장/로드에 사용돼요.</p>
+  </div>
+
+  <div class="block">
+    <h2>🔧 <code>SCOPES</code> 정의</h2>
+    <pre><code>SCOPES = {
+  'google': ['https://www.googleapis.com/auth/calendar.readonly']
+}</code></pre>
+    <p>플랫폼별로 필요한 OAuth 권한 범위를 정의한 딕셔너리입니다.</p>
+  </div>
+
+  <div class="block">
+    <h2>🧠 클래스: <code>AuthManager</code></h2>
+    <p>인증 플로우를 시작하고, 토큰을 저장/로드하고, 사용자 정보를 추출하는 책임을 집니다.</p>
+
+    <h3>📌 <code>__init__(platform)</code></h3>
+    <p>플랫폼(google, notion 등)에 따라 인증 범위를 지정합니다.</p>
+
+    <h3>📌 <code>create_flow()</code></h3>
+    <ul>
+      <li>Google OAuth 인증 URL을 생성하는 <code>Flow</code> 객체를 반환</li>
+      <li><code>client_id</code>, <code>client_secret</code>, <code>redirect_uri</code>는 환경 변수에서 로드</li>
+    </ul>
+
+    <h3>📌 <code>save_tokens(user_id, credentials)</code></h3>
+    <p>사용자 토큰을 Redis에 저장합니다. <code>tokens:{platform}:{user_id}</code> 형식으로 저장돼요.</p>
+
+    <h3>📌 <code>load_tokens(user_id)</code></h3>
+    <p>Redis에서 토큰을 로드하여 딕셔너리 형태로 반환합니다.</p>
+
+    <h3>📌 <code>credentials_to_dict(credentials)</code></h3>
+    <p><code>Credentials</code> 객체를 JSON 저장 가능한 딕셔너리로 변환합니다.</p>
+
+    <h3>📌 <code>get_user_id_from_credentials(credentials)</code></h3>
+    <p>인증된 <code>id_token</code>에서 사용자 이메일을 추출합니다.</p>
+  </div>
+
+  <div class="block">
+    <h2>📦 Redis 키 구조</h2>
+    <ul>
+      <li><strong>저장 형식:</strong> <code>tokens:{platform}:{user_id}</code></li>
+      <li><strong>예:</strong> <code>tokens:google:me@example.com</code></li>
+      <li><strong>내용:</strong> JSON 직렬화된 access_token + refresh_token 등</li>
+    </ul>
+  </div>
+
+  <div class="block">
+    <h2>🚧 확장 포인트</h2>
+    <ul>
+      <li>현재는 Google만 구현됨</li>
+      <li>Notion/Slack 인증 처리 시 <code>create_flow()</code> 내 분기 확장 예정</li>
+    </ul>
+  </div>
+
+</body>
+</html>
