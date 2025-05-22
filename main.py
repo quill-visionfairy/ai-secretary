@@ -10,6 +10,7 @@ from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import Flow
 from googleapiclient.discovery import build
+from auth_manager import AuthManager
 
 # .env 파일 로드
 load_dotenv()
@@ -17,54 +18,28 @@ load_dotenv()
 # Google Calendar에 접근하기 위한 권한 범위
 SCOPES = ['https://www.googleapis.com/auth/calendar.readonly']
 
-def create_flow():
-    """OAuth 2.0 Flow 객체 생성"""
-    client_config = {
-        "web": {
-            "client_id": os.getenv("GOOGLE_CLIENT_ID"),
-            "project_id": os.getenv("GOOGLE_PROJECT_ID"),
-            "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-            "token_uri": "https://oauth2.googleapis.com/token",
-            "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
-            "client_secret": os.getenv("GOOGLE_CLIENT_SECRET"),
-            "redirect_uris": [
-                "https://ai-secretary-148126309509.asia-northeast3.run.app/oauth2callback"
-            ]
-        }
-    }
-    
-    return Flow.from_client_config(
-        client_config,
-        scopes=SCOPES,
-        redirect_uri="https://ai-secretary-148126309509.asia-northeast3.run.app/oauth2callback"
-    )
+def create_flow(platform='google'):
+    """플랫폼별 OAuth Flow 객체 생성 (AuthManager 사용)"""
+    return AuthManager(platform).create_flow()
 
-def get_calendar_service():
-    """Google Calendar API 서비스 객체 반환"""
-    if 'credentials' not in session:
+def get_calendar_service(user_id, platform='google'):
+    """Redis 기반 토큰으로 Google Calendar API 서비스 객체 반환"""
+    auth = AuthManager(platform)
+    tokens = auth.load_tokens(user_id)
+    if not tokens:
         return None
-
-    creds = Credentials.from_authorized_user_info(session['credentials'], SCOPES)
-
+    creds = Credentials.from_authorized_user_info(tokens, auth.scopes)
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
             creds.refresh(Request())
-            session['credentials'] = credentials_to_dict(creds)
+            auth.save_tokens(user_id, creds)
         else:
             return None
-
     return build('calendar', 'v3', credentials=creds)
 
 def credentials_to_dict(credentials):
-    """Credentials 객체를 딕셔너리로 변환"""
-    return {
-        'token': credentials.token,
-        'refresh_token': credentials.refresh_token,
-        'token_uri': credentials.token_uri,
-        'client_id': credentials.client_id,
-        'client_secret': credentials.client_secret,
-        'scopes': credentials.scopes
-    }
+    """Credentials 객체를 딕셔너리로 변환 (AuthManager 사용)"""
+    return AuthManager('google').credentials_to_dict(credentials)
 
 def get_events(service, start_date, end_date):
     """지정된 기간의 일정을 가져옴"""
@@ -128,14 +103,12 @@ def print_events_by_date(events):
         else:  # 종일 일정인 경우
             print(f"📌 종일 - {event['summary']}")
 
-def check_calendar(start_date, end_date):
-    """캘린더 일정 조회 메인 함수"""
-    service = get_calendar_service()
+def check_google_calendar(user_id, start_date, end_date, platform='google'):
+    """구글 캘린더 일정 조회 메인 함수 (user_id, platform 기반)"""
+    service = get_calendar_service(user_id, platform)
     if not service:
         return {"error": "Authentication required"}
-        
     events = get_events(service, start_date, end_date)
-    
     # 이벤트 데이터 가공
     formatted_events = []
     for event in events:
@@ -145,15 +118,36 @@ def check_calendar(start_date, end_date):
             'is_all_day': 'T' not in event['start'].get('dateTime', '')
         }
         formatted_events.append(formatted_event)
-    
     return formatted_events
 
+def route_calendar_service(user_id, start_date, end_date, platform=None):
+    """
+    user_id와 platform을 받아 연결된 서비스에 따라 캘린더 조회 함수를 라우팅
+    platform이 명시되지 않으면, 기본 연결(google)로 처리
+    추후 Notion, Slack 등 확장 가능
+    """
+    # 실제 서비스 연결 정보는 DB/Redis 등에서 조회해야 함 (여기선 platform 인자 우선)
+    if not platform:
+        platform = 'google'  # 기본값
+    if platform == 'google':
+        return check_google_calendar(user_id, start_date, end_date, platform)
+    # elif platform == 'notion':
+    #     return check_notion_calendar(user_id, start_date, end_date)
+    # elif platform == 'slack':
+    #     return check_slack_calendar(user_id, start_date, end_date)
+    else:
+        return {"error": f"지원하지 않는 플랫폼입니다: {platform}"}
+
 def main():
-    # 기본값: 어제, 오늘, 내일 일정 확인
+    user_id = "testuser@gmail.com"
+    platform = "google"
+
     today = datetime.datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
-    start_date = today - timedelta(days=1)  # 어제
-    end_date = today + timedelta(days=2)    # 내일 끝
-    check_calendar(start_date, end_date)
+    start_date = today - timedelta(days=1)
+    end_date = today + timedelta(days=2)
+
+    result = route_calendar_service(user_id, start_date, end_date, platform)
+    print(result)
 
 if __name__ == '__main__':
     main()

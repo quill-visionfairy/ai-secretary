@@ -5,3 +5,4 @@ venv/
 service_account.json
 oauth_config.json
 .vscode/token.json
+env.yaml

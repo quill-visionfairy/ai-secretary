@@ -1,9 +1,10 @@
 from openai import OpenAI
 import datetime
 import os
-from main import check_calendar
+from main import get_calendar_service, get_events, route_calendar_service
 from datetime import timedelta
 from dotenv import load_dotenv
+import json
 
 # .env 파일 로드
 load_dotenv()
@@ -19,104 +20,127 @@ def init_openai_client():
     """OpenAI 클라이언트 초기화"""
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
-        raise GPTError(
-            "OPENAI_API_KEY 환경 변수가 설정되지 않았습니다.\n"
-            "1. .env 파일을 생성하세요.\n"
-            "2. OPENAI_API_KEY=your_api_key_here 형식으로 API 키를 추가하세요.",
-            "api_key_missing"
-        )
+        raise ValueError("OPENAI_API_KEY 환경 변수가 설정되지 않았습니다.")
     return OpenAI(api_key=api_key)
 
-def get_calendar_function_spec():
-    """캘린더 함수 스펙 정의"""
-    return [{
-        "name": "check_calendar",
-        "description": "Google 캘린더 일정 확인",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "start_date": {
-                    "type": "string",
-                    "description": "ISO 8601 형식 시작일 (예: 2025-05-20)"
-                },
-                "end_date": {
-                    "type": "string",
-                    "description": "ISO 8601 형식 종료일 (예: 2025-05-22)"
-                }
-            },
-            "required": ["start_date", "end_date"]
-        }
-    }]
+def extract_date_range(query: str) -> dict:
+    """자연어 쿼리에서 날짜 범위 추출"""
+    client = init_openai_client()
+    
+    system_message = """당신은 사용자의 자연어 쿼리에서 날짜 범위를 추출하는 AI 비서입니다.
+다음 규칙을 따라주세요:
+1. 시작 시간과 종료 시간을 ISO 8601 형식으로 반환
+2. "오늘", "내일", "다음 주" 등의 상대적 표현을 실제 날짜로 변환
+3. 특정 날짜만 언급된 경우 해당 날의 00:00:00부터 23:59:59까지로 설정
+4. 시간이 명시되지 않은 경우 하루 전체를 범위로 설정
+5. 날짜가 명시되지 않은 경우 오늘을 기준으로 설정"""
 
-def process_calendar_query(query: str):
-    """사용자 쿼리 처리"""
+    response = client.chat.completions.create(
+        model="gpt-3.5-turbo",
+        messages=[
+            {"role": "system", "content": system_message},
+            {"role": "user", "content": query}
+        ],
+        response_format={"type": "json_object"}
+    )
+
+    result = response.choices[0].message.content
+    return json.loads(result)
+
+def process_calendar_query(query: str, user_id: str = None, platform: str = 'google'):
+    """사용자 쿼리 처리 (user_id, platform 지원)"""
     try:
-        # OpenAI 클라이언트 초기화
-        client = init_openai_client()
-
-        # API 호출
+        if not user_id:
+            print("[API ERROR] user_id가 없음 - 인증 필요")
+            return {
+                "status": "error",
+                "message": "사용자 인증이 필요합니다. 먼저 로그인 해주세요."
+            }
+        # 1. 자연어에서 날짜 범위 추출
         try:
-            response = client.chat.completions.create(
+            date_range = extract_date_range(query)
+            start_time = date_range.get("start_time")
+            end_time = date_range.get("end_time")
+        except Exception as e:
+            print(f"[GPT ERROR] 날짜 범위 추출 실패: {str(e)}")
+            return {
+                "status": "error",
+                "message": f"GPT 호출 중 오류 발생: 날짜 범위 추출 실패 - {str(e)}"
+            }
+
+        if not start_time or not end_time:
+            print("[API ERROR] 날짜 범위 추출 결과 없음")
+            return {
+                "status": "error",
+                "message": "날짜 범위를 추출할 수 없습니다."
+            }
+
+        # 2. 캘린더 조회 (user_id, platform 활용)
+        try:
+            start = datetime.datetime.fromisoformat(start_time)
+            end = datetime.datetime.fromisoformat(end_time)
+            service = get_calendar_service(user_id, platform)
+            if not service:
+                print(f"[API ERROR] 캘린더 서비스 인증 실패: user_id={user_id}, platform={platform}")
+                events = []
+            else:
+                events = get_events(service, start, end)
+        except Exception as e:
+            print(f"[API ERROR] 캘린더 조회 실패: {str(e)}")
+            return {
+                "status": "error",
+                "message": f"API 호출 중 오류 발생: 캘린더 조회 실패 - {str(e)}"
+            }
+
+        # 3. GPT에게 일정 정보 전달하여 응답 생성
+        try:
+            client = init_openai_client()
+            events_description = "조회된 일정:\n"
+            if events:
+                for event in events:
+                    events_description += f"- {event['start']}: {event['summary']}\n"
+            else:
+                events_description += "해당 기간에 예정된 일정이 없습니다.\n"
+
+            system_message = f"""당신은 {platform.title()} Calendar 일정 관리를 돕는 AI 비서입니다.\n사용자의 일정 관련 질문에 친절하게 답변해주세요.\n일정이 있다면 시간과 제목을 명확하게 알려주시고, \n일정이 없다면 그 날이 비어있다고 알려주세요.\n답변은 한국어로 해주세요."""
+
+            final_response = client.chat.completions.create(
                 model="gpt-3.5-turbo",
                 messages=[
-                    {"role": "system", "content": "당신은 Google Calendar 일정 관리를 돕는 AI 비서입니다."},
-                    {"role": "user", "content": query}
-                ],
-                tools=[{
-                    "type": "function",
-                    "function": get_calendar_function_spec()[0]
-                }],
-                tool_choice={"type": "function", "function": {"name": "check_calendar"}}
+                    {"role": "system", "content": system_message},
+                    {"role": "user", "content": query},
+                    {"role": "system", "content": f"조회한 기간: {start_time} ~ {end_time}"},
+                    {"role": "system", "content": events_description}
+                ]
             )
-        except Exception as api_error:
-            if "insufficient_quota" in str(api_error):
-                raise GPTError(
-                    "OpenAI API 할당량이 초과되었습니다. 다음을 확인해주세요:\n"
-                    "1. OpenAI 계정의 결제 상태\n"
-                    "2. API 사용량 제한\n"
-                    "3. 현재 청구 주기의 사용량",
-                    "quota_exceeded"
-                )
-            raise GPTError(f"OpenAI API 호출 중 오류 발생: {str(api_error)}", "api_error")
+        except Exception as e:
+            print(f"[GPT ERROR] GPT 응답 생성 실패: {str(e)}")
+            return {
+                "status": "error",
+                "message": f"GPT 호출 중 오류 발생: 응답 생성 실패 - {str(e)}"
+            }
 
-        # 응답 처리
-        tool_call = response.choices[0].message.tool_calls[0]
-        if tool_call.function.name == "check_calendar":
-            import json
-            args = json.loads(tool_call.function.arguments)
-            
-            try:
-                start = datetime.datetime.fromisoformat(args["start_date"])
-                end = datetime.datetime.fromisoformat(args["end_date"])
-                return {
-                    "status": "success",
-                    "data": check_calendar(start, end)
-                }
-            except ValueError as e:
-                return {
-                    "status": "error",
-                    "error": f"날짜 형식 오류: {str(e)}"
-                }
-            except Exception as e:
-                return {
-                    "status": "error",
-                    "error": f"캘린더 조회 중 오류 발생: {str(e)}"
-                }
-
-    except GPTError as e:
         return {
-            "status": "error",
-            "error": e.message,
-            "error_type": e.error_type
+            "status": "success",
+            "user_id": user_id,
+            "query_info": {
+                "original_query": query,
+                "start_time": start_time,
+                "end_time": end_time
+            },
+            "events": events,
+            "response": final_response.choices[0].message.content
         }
+
     except Exception as e:
+        print(f"[API ERROR] process_calendar_query 전체 예외: {str(e)}")
         return {
             "status": "error",
-            "error": f"예상치 못한 오류 발생: {str(e)}"
+            "message": f"API 호출 중 알 수 없는 오류 발생: {str(e)}"
         }
 
 if __name__ == "__main__":
-    # 사용자 입력 받기
-    user_query = input("어떤 일정을 확인하시겠습니까? (예: 이번 주 일정 알려줘): ")
-    result = process_calendar_query(user_query)
+    # 테스트 쿼리
+    query = input("어떤 일정을 확인하시겠습니까? (예: 이번 주 일정 알려줘): ")
+    result = process_calendar_query(query)
     print(f"결과: {result}")
