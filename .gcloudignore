@@ -1,0 +1,11 @@
+.git
+.gitignore
+.env
+__pycache__/
+*.pyc
+token.json
+oauth_config.json
+venv/
+.venv/
+.idea/
+.vscode/ 
