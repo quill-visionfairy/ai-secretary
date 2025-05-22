@@ -10,9 +10,6 @@ COPY requirements.txt .
 # 패키지 설치
 RUN pip install --no-cache-dir -r requirements.txt && pip show Flask && pip freeze > /installed.txt
 
-# .env 복사 (환경 변수 파일 포함)
-COPY .env .env
-
 # 전체 프로젝트 복사 (.py, templates, etc)
 COPY . .
 
