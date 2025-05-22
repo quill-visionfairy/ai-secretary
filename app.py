@@ -283,6 +283,12 @@ def debug_session():
         "credentials": session.get('credentials', '없음 😢')
     }
 
+@app.errorhandler(500)
+def internal_error(error):
+    import traceback
+    print("🔥 내부 오류 발생:", traceback.format_exc())
+    return jsonify({"error": "서버 내부 오류 발생", "details": str(error)}), 500
+
 if __name__ == '__main__':
     # Cloud Run은 PORT 환경 변수를 사용
     port = int(os.environ.get('PORT', 8080))
