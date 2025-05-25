@@ -1,44 +1,65 @@
-from __future__ import print_function
 import os.path
 import datetime
-from datetime import timedelta
 import json
+import logging
 from dotenv import load_dotenv
 from flask import session, redirect, url_for
-
-from google.auth.transport.requests import Request
-from google.oauth2.credentials import Credentials
-from google_auth_oauthlib.flow import Flow
+from datetime import timedelta
 from googleapiclient.discovery import build
-from auth_manager import AuthManager
-from config import SCOPES
+from google.oauth2.credentials import Credentials
+from google.auth.transport.requests import Request
+from py.config import SCOPES
+
+# logging 설정
+logging.basicConfig(level=logging.INFO, format='[%(levelname)s] %(asctime)s %(message)s')
+logger = logging.getLogger(__name__)
 
 # .env 파일 로드
 load_dotenv()
 
-def create_flow(platform='google'):
-    """플랫폼별 OAuth Flow 객체 생성 (AuthManager 사용)"""
-    return AuthManager(platform).create_flow()
+def create_flow(platform='gpt', target='google'):
+    """플랫폼/타겟별 OAuth Flow 객체 생성 (AuthManager 사용)"""
+    return get_auth(platform, target).create_flow()
 
-def get_calendar_service(user_id, platform='google'):
+def get_calendar_service(user_id, platform='gpt', target='google', auth=None):
     """Redis 기반 토큰으로 Google Calendar API 서비스 객체 반환"""
-    auth = AuthManager(platform)
+    if auth is None:
+        auth = get_auth(platform, target)
     tokens = auth.load_tokens(user_id)
     if not tokens:
+        logger.warning(f"tokens= {tokens}")
         return None
-    scopes = SCOPES.get(platform, [])
-    creds = Credentials.from_authorized_user_info(tokens, scopes)
+    try:
+        creds = Credentials.from_authorized_user_info(tokens, auth.scopes)
+    except Exception as e:
+        logger.error(f"Credentials.from_authorized_user_info 예외 발생: {e}")
+        return None
+    # refresh_token이 없으면 access_token을 revoke하고 None 반환
+    if not getattr(creds, 'refresh_token', None):
+        # access_token 철회 시도
+        auth.revoke_token(creds.token)
+        # 토큰 삭제
+        key = f"tokens:{platform}:{target}:{user_id}"
+        auth.redis_client.delete(key)
+        logger.error("[ERROR] refresh_token이 없어 토큰을 철회하고 재인증 필요")
+        return None
     if not creds or not creds.valid:
+        logger.warning("❌ token not valid!")
         if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
-            auth.save_tokens(user_id, creds)
+            try:
+                creds.refresh(Request())
+                auth.save_tokens(user_id, creds)
+            except Exception as e:
+                logger.error(f"토큰 refresh 중 예외 발생: {e}")
+                return None
         else:
+            logger.warning("❌ token not valid!")
             return None
     return build('calendar', 'v3', credentials=creds)
 
 def credentials_to_dict(credentials):
     """Credentials 객체를 딕셔너리로 변환 (AuthManager 사용)"""
-    return AuthManager('google').credentials_to_dict(credentials)
+    return get_auth('gpt', 'google').credentials_to_dict(credentials)
 
 def get_events(service, start_date, end_date):
     """지정된 기간의 일정을 가져옴"""
@@ -107,6 +128,9 @@ def check_google_calendar(user_id, start_date, end_date, platform='google'):
     service = get_calendar_service(user_id, platform)
     if not service:
         return {"error": "Authentication required"}
+    # refresh_token 없음 등으로 dict 에러 반환 시
+    if isinstance(service, dict) and service.get("error"):
+        return {"error": service["error"]}
     events = get_events(service, start_date, end_date)
     # 이벤트 데이터 가공
     formatted_events = []

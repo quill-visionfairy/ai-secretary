@@ -45,6 +45,7 @@ env.yaml
 *.json
 service_account.json
 oauth_config.json
+client_secrets.json
 
 # 💻 운영체제별
 .DS_Store

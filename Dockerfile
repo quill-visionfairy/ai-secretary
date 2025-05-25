@@ -5,7 +5,7 @@ FROM python:3.9-slim
 WORKDIR /app
 
 # requirements 먼저 복사
-COPY requirements.txt .
+COPY requirements.txt ./
 
 # 패키지 설치
 RUN pip install --no-cache-dir -r requirements.txt && pip show Flask && pip freeze > /installed.txt

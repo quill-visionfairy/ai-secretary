@@ -1,10 +1,10 @@
-from openai import OpenAI
-import datetime
 import os
-from main import get_calendar_service, get_events, route_calendar_service
-from datetime import timedelta
-from dotenv import load_dotenv
 import json
+import datetime
+from dotenv import load_dotenv
+from openai import OpenAI
+
+from .service import get_calendar_service, get_events
 
 # .env 파일 로드
 load_dotenv()
@@ -102,12 +102,10 @@ def process_calendar_query(query: str, user_id: str = None, platform: str = 'goo
             else:
                 events_description += "해당 기간에 예정된 일정이 없습니다.\n"
 
-            system_message = f"""당신은 {platform.title()} Calendar 일정 관리를 돕는 AI 비서입니다.\n사용자의 일정 관련 질문에 친절하게 답변해주세요.\n일정이 있다면 시간과 제목을 명확하게 알려주시고, \n일정이 없다면 그 날이 비어있다고 알려주세요.\n답변은 한국어로 해주세요."""
 
             final_response = client.chat.completions.create(
                 model="gpt-3.5-turbo",
                 messages=[
-                    {"role": "system", "content": system_message},
                     {"role": "user", "content": query},
                     {"role": "system", "content": f"조회한 기간: {start_time} ~ {end_time}"},
                     {"role": "system", "content": events_description}

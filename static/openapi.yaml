@@ -1,0 +1,160 @@
+openapi: "3.1.0"
+
+info:
+  title: AI-Calendar-Assistant
+  description: 구글 캘린더와 연동되어 자연어로 일정을 조회하는 걸 도와줌.
+  version: "0.0.1"
+
+servers:
+  - url: https://ai-secretary-148126309509.asia-northeast3.run.app
+
+paths:
+  /login:
+    get:
+      operationId: loginWithGoogle
+      summary: 구글 Oauth 로그인
+      description: 구글 인증을 요청합니다. 인증 후 토큰이 저장됩니다.
+      parameters:
+        - name: platform
+          in: query
+          required: false
+          schema:
+            type: string
+            default: google
+      responses:
+        '302':
+          description: oauth page URL redirection
+
+  /calendar:
+    get:
+      operationId: getCalendarEvents
+      summary: 일정조회
+      description: stat_date와 end_date사이의 일정을 반환
+      parameters:
+        - name: stat_date
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date-time
+        - name: end_date
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date-time
+        - name: user_id
+          description: 사용자 이메일 또는 고유 ID
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 일정 목록
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                  events:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        summary:
+                          type: string
+                        start:
+                          type: string
+                        is_all_day:
+                          type: boolean
+  /query_calendar:
+    post:
+      operationId: postCalendarEvents
+      summary: 캘린더 쿼리
+      description: 인증된 사용자의 캘린더 정보를 조회합니다.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - start_time
+                - end_time
+                - user_id
+                - platform
+                - target
+              properties:
+                start_time:
+                  type: string
+                  format: date-time
+                  description: 조회 시작 시간 (ISO 8601)
+                end_time:
+                  type: string
+                  format: date-time
+                  description: 조회 종료 시간 (ISO 8601)
+                user_id:
+                  type: string
+                  description: 사용자 ID(이메일)
+                platform:
+                  type: string
+                target:
+                  type: string
+      responses:
+        '200':
+          description: 성공적으로 캘린더 정보를 반환
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                  events:
+                    type: array
+                    items:
+                      type: object
+        '401':
+          description: 인증 토큰 누락/실패
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                  message:
+                    type: string
+        '405':
+          description: 허용되지 않은 메서드(POST만 허용)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                  message:
+                    type: string
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    Event:
+      type: object
+      properties:
+        summary:
+          type: string
+        start:
+          type: string
+        is_all_day:
+          type: boolean
